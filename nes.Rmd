@@ -8,14 +8,17 @@ output:
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = FALSE)
+
 library(rstanarm)
-library(report)
 library(tidyverse)
+
+# library(report)
 
 load("nes.rda")
 ```
 
 ```{r clean_data}
+
 # This data is a mess. Where is the code book? Is this real NES data or some bs
 # made up sample? This is a really good place to write down some thoughts on
 # this data and where it comes from. Take a look at ROAS, pages 141 -- 142.
@@ -35,7 +38,8 @@ x <- nes %>%
   mutate(gender = as.factor(ifelse(female == 1, "female", "non-female"))) %>% 
   mutate(race = as.factor(case_when(race_adj == 1 ~ "White",
                                     race_adj == 2 ~ "Black",
-                                    TRUE ~ "Other")))
+                                    TRUE ~ "Other"))) %>%
+  mutate(realideo = real_ideo - 1)
   
 ```
 
@@ -49,6 +53,7 @@ fit_1 <- stan_glm(data = x, partyid7 ~ gender, refresh = 0)
 ```
 
 ```{r model_2, cache=TRUE}
+
 # What about the relationship between race and party ID? Need to have created a
 # factor variable, or at least a character variable.
 
@@ -57,6 +62,7 @@ fit_2 <- stan_glm(data = x, partyid7 ~ race, refresh = 0)
 
 
 ```{r model_3, cache=TRUE}
+
 fit_3 <- stan_glm(data = x, partyid7 ~ real_ideo, refresh = 0)
 ```
 
@@ -65,6 +71,7 @@ fit_3 <- stan_glm(data = x, partyid7 ~ real_ideo, refresh = 0)
 Here is a nicely printed summary of my model results, showing the relationship between party ID, on a 1 through 7 scale, and ideology, also on a 1 through 7 scale. Although these are ordered categories, I treat both variables as continuous.
 
 ```{r show_the_model, comment=NA}
+
 print(fit_3, detail = FALSE, digits = 2)
 ```
 
@@ -74,19 +81,24 @@ Instead of just printing the simple object, we could print its summary.
 
 
 ```{r show_the_model_summary, comment=NA}
+
 print(summary(fit_3), detail = FALSE, digits = 2)
 ```
 
 But that adds a bunch of junk, including run-off-the-page text. Maybe there are options in something like `print.stanmvreg()` which might be helpful. Has no one bothered to ask on RStudio Community?
 
 ```{r left_over, include=FALSE}
-x %>% 
+
+y <- x %>% 
   select(partyid7, gender, race, real_ideo) %>% 
   mutate(pred_gender = predict(fit_1, x)) %>% 
   mutate(pred_race = predict(fit_2, x)) %>% 
-  mutate(pred_idea = predict(fit_3, x)) %>% 
-  slice(8000:8010) # Interesting rows.
+  mutate(pred_idea = predict(fit_3, x))
 
+ggplot(y, aes(x = pred_gender, y = partyid7, group = pred_gender)) +
+  geom_boxplot()
+
+# Interesting
 # How similar/different are these predictions?
 
 # How do we know if a prediction is good?
@@ -95,8 +107,28 @@ x %>%
 
 # Think about penalty functions and decision-making.
 
-
 ```
+
+
+```{r}
+
+fit_y <- stan_glm(partyid7 ~ gender + race + real_ideo, data = x, refresh = 0)
+
+fit_x <- stan_glm(partyid7 ~ gender + race + realideo, data = x, refresh = 0)
+```
+
+```{r}
+
+summary(fit_y)
+```
+```{r}
+
+
+
+summary(fit_x)
+```
+
+
 
 
 ```{r}
