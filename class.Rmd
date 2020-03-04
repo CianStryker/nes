@@ -1,0 +1,102 @@
+---
+title: "Class"
+author: "Cian Stryker"
+date: "3/4/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+
+library(googlesheets4)
+library(infer)
+library(purrr)
+library(data.table)
+library(tidyverse)
+```
+
+```{r}
+
+sheets_deauth()
+w <- read_sheet("https://docs.google.com/spreadsheets/d/14HmwN2cEVAJHupuehCuLdwG9BXtR3COrxDgaaylLhkA/edit#gid=0")
+```
+
+```{r}
+
+w2 <- w %>%
+  mutate(num_red = Red/25) %>%
+  mutate(mean_prop = mean(num_red))
+
+
+ggplot(w2, aes(x = num_red)) +
+  geom_histogram()
+```
+```{r, Prep and Graph for Question 3}
+
+ID <- c(1:5000)
+bead <- c("crimson", "white", "white", "white", "white")
+
+bowl <- data.frame(ID, bead)
+
+virtual_samples <- bowl %>%
+  rep_sample_n(size = 25, reps = 5000)
+
+virtual_prop_red <- virtual_samples %>%
+  group_by(replicate) %>%
+  summarize(crimson = sum(bead == "crimson")) %>%
+  mutate(prop_crimson = crimson / 25)
+
+ggplot(virtual_prop_red, aes(x = prop_crimson, color = "red", fill = "red")) +
+  geom_histogram(binwidth = 0.05, boundary = 0.4) +
+  labs(
+    x = "Proportion of 5000 balls that were Crimson",
+    title = "Distribution of 25 proportions of Crimson"
+  ) +
+  guides(color = FALSE, fill = FALSE)
+```
+
+## Question 4
+```{r, Sampling for Question 4, message=FALSE}
+
+# Alright I'm going to be honest here. I wanted to copy Preceptor Kane's graph because I thought it was cool, but I initially wrote the code four times. I just wanted to get the graph made first, before I went back through and simplified my code and used purrr. But I'm going to procede from here acting like I always used my own function and purrr techniques.
+
+# So I just made my own function run the sampling code that I ran in the prevous question. By setting n as the size and the divisible portion, I made it flexible enought to work later on for me.
+
+test <- function(n) {
+  bowl %>%
+    rep_sample_n(size = n, reps = 1000) %>%
+    group_by(replicate) %>%
+    summarize(crimson = sum(bead == "crimson")) %>%
+    mutate(prop_crimson = crimson / n) %>%
+    select(prop_crimson)
+}
+# Here I made a list of my function ran four times. This means that my four tests are in four datasets within one larger list. From here I was able to begin using purrr.
+
+func <- list(test(50), test(100), test(500), test(2500))
+
+# I'm not sure I even like purrr but I had to use it here so whatever. First I used the map function to apply the data.frame command to each of my tests within my list. Then I did the same with melt, so that all the observations would be in the correct long from. Then I had to use the rbindlist() command to combine the four tests into one dataframe with a new column that differentiated them from eachother. In this case the id coloumn was literally id.
+
+# Then I used the as.factor() command record them as the right type for my graphing. Originally I did this without purrr, but I see why we should get some purrr practice.
+
+ii <- map(func, data.frame)
+uu <- map(ii, reshape2::melt)
+ww <- rbindlist(uu, idcol = TRUE)
+ww$.id <- as.factor(ww$.id)
+```
+
+```{r, Graphing for Question 4}
+
+# Graphing time! Nothing crazy here, but I realized that the Preceptor's graph was actually a collection of density graphs. At least I think it is... but I used densities myself and then just renamed the y axis to match his. I added a bunch of labels to match, and made it alpha to create that cool effect where you can see each distribution stacked on eachother. I did not copy the colors though because I wanted a degree of originality. Oh, setting the seq, and lim within the scale_x_continous() is really important to get the overall look right.
+
+ggplot(ww, aes(x = value, group = .id, fill = .id)) +
+  geom_density(alpha = .3) +
+  labs(
+    x = "Proportion of balls that were crimson",
+    title = "Distribution of Percentage Crimson",
+    subtitle = "Average sampled percentage is close to the true percentage of 20%",
+    y = "Count"
+  ) +
+  scale_x_continuous(breaks = seq(0, .5, 0.1), lim = c(0, .5)) +
+  guides(color = FALSE) +
+  scale_fill_discrete(name = "Size", labels = c("50", "100", "500", "2500"))
+```
